@@ -1,16 +1,30 @@
 <html>
 <head>
     <script src="two.js"></script>
+    <style>
+        .toolbar {
+            width: 100%;
+            float: left;
+        }
+        #scene {
+            width: 100%;
+        }
+    </style>
 </head>
 
 <body>
+    <!-- <input id="sf" type="range" min="0" max="2"/> -->
+    <div class="toolbar">
+        <!-- <input type="number" id="sf" style="z-index: 10;"/> -->
+    </div>
+    <div id="scene"></div>
     <script>
         
         var two = new Two({
-            type: Two.Types.svg,
+            type: Two.Types.canvas,
             fullscreen: true,
             autostart: true
-        }).appendTo(document.body);
+        }).appendTo(document.getElementById("scene"));
         
         var ls = [];
         var springs = [];
@@ -34,8 +48,10 @@
 
         function createCircle(pos, vel) {
             var circ = new Two.Circle(0, 0, 10, 10);
+            var line = new Two.Line(0,0,10,0);
             ls.push({
                 shape: circ,
+                line: line,
                 pos: pos,
                 vel: vel,
                 mass: 1,
@@ -43,10 +59,11 @@
                 id: ls.length
             });
             two.add(circ);
+            two.add(line);
             return ls[ls.length - 1];
         }
 
-        function createSpring(s1, s2, force = 0.1024, damping = 0.01) {
+        function createSpring(s1, s2, force = 0.4024, damping = 0.06) {
             var line = new Two.Line(s1.pos.x, s1.pos.y, s2.pos.x, s2.pos.y);
             springs.push({
                 line: line,
@@ -78,18 +95,25 @@
 
             for (var i = 0; i < springs.length; i++) {
                 var spring = springs[i];
-                var norm = spring.s1.pos.clone().subtract(spring.s2.pos).normalize();
+                var normS1 = spring.s1.pos.clone().subtract(spring.s2.pos).normalize();
+                var normS2 = spring.s2.pos.clone().subtract(spring.s1.pos).normalize();
+
                 var distC = spring.s1.pos.clone().distanceTo(spring.s2.pos);
 
-                var relativeVel = spring.s1.vel.clone().sub(spring.s2.vel);
-                var damping = relativeVel.multiply(spring.damping * globalDampingForceMult);//.multiply(norm).multiply(relativeVel.clone().dot(norm));
+                var relativeVelS1 = spring.s1.vel.clone().sub(spring.s2.vel);
+                var relativeVelS2 = spring.s2.vel.clone().sub(spring.s1.vel);
 
+                var dampingS1 = normS1.clone().multiply(spring.damping * globalDampingForceMult * relativeVelS1.clone().dot(normS1));
+                var dampingS2 = normS2.clone().multiply(spring.damping * globalDampingForceMult * relativeVelS2.clone().dot(normS2));
 
-                var force = norm.clone().multiply(spring.dist - distC).multiply(spring.force * globalSpringForceMultiplier);
+                var forceS1 = normS1.clone().multiply(spring.dist - distC).multiply(spring.force * globalSpringForceMultiplier);
+                var forceS2 = normS2.clone().multiply(spring.dist - distC).multiply(spring.force * globalSpringForceMultiplier);
 
-                force.sub(relativeVel);
-                spring.s1.vel.addSelf(force.clone().multiply(1 / spring.s1.mass));
-                spring.s2.vel.subSelf(force.clone().multiply(1 / spring.s2.mass));
+                forceS1.sub(dampingS1);
+                forceS2.sub(dampingS2);
+
+                spring.s1.vel.addSelf(forceS1.clone().multiply(1 / spring.s1.mass));
+                spring.s2.vel.addSelf(forceS2.clone().multiply(1 / spring.s2.mass));
 
 
                 spring.line.remove();
@@ -152,6 +176,8 @@
                 ls[i].pos.y += ls[i].vel.y;
                 ls[i].shape.translation.x = ls[i].pos.x;
                 ls[i].shape.translation.y = ls[i].pos.y;
+                ls[i].line.translation.x = ls[i].pos.x;
+                ls[i].line.translation.y = ls[i].pos.y;
             }
 
             if (mouseState) {
