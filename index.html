@@ -1,0 +1,217 @@
+<html>
+<head>
+    <script src="two.js"></script>
+</head>
+
+<body>
+    <script>
+        
+        var two = new Two({
+            type: Two.Types.svg,
+            fullscreen: true,
+            autostart: true
+        }).appendTo(document.body);
+        
+        var ls = [];
+        var springs = [];
+        var amt = 40;
+        var gravity = new Two.Vector(0, 0.02);
+        var mousePos = new Two.Vector(0, 0);
+        var mouseState = 0;
+        var dragging = 0;
+        var draggingIdx = 0;
+        
+        var globalSpringForceMultiplier = 1.;
+        var globalDampingForceMult = 1.;
+
+        function zv() {
+            return new Two.Vector(0,0);
+        }
+
+        function rand() {
+            return Math.random() - .5;
+        }
+
+        function createCircle(pos, vel) {
+            var circ = new Two.Circle(0, 0, 10, 10);
+            ls.push({
+                shape: circ,
+                pos: pos,
+                vel: vel,
+                mass: 1,
+                radius: 10,
+                id: ls.length
+            });
+            two.add(circ);
+            return ls[ls.length - 1];
+        }
+
+        function createSpring(s1, s2, force = 0.1024, damping = 0.01) {
+            var line = new Two.Line(s1.pos.x, s1.pos.y, s2.pos.x, s2.pos.y);
+            springs.push({
+                line: line,
+                s1: s1,
+                s2: s2,
+                dist: s1.pos.clone().distanceTo(s2.pos),
+                force: force,
+                damping: damping,
+            });
+            two.add(line);
+            return springs[springs.length - 1];
+        }
+
+        for(var i = 0; i < 8; i++) {
+            var p1 = createCircle(new Two.Vector(two.width * .5 - 32, 100 + i * 64), zv());
+            var p2 = createCircle(new Two.Vector(two.width * .5 + 32, 100 + i * 64), zv());
+            createSpring(p1, p2);
+            if(i >= 1) {
+                createSpring(p1, ls[p1.id - 2]);
+                createSpring(p2, ls[p2.id - 2]);
+                createSpring(p1, ls[p1.id - 1]);
+                createSpring(p2, ls[p2.id - 3]);
+
+            }
+        }
+
+
+        two.bind('update', function () {
+
+            for (var i = 0; i < springs.length; i++) {
+                var spring = springs[i];
+                var norm = spring.s1.pos.clone().subtract(spring.s2.pos).normalize();
+                var distC = spring.s1.pos.clone().distanceTo(spring.s2.pos);
+
+                var relativeVel = spring.s1.vel.clone().sub(spring.s2.vel);
+                var damping = relativeVel.multiply(spring.damping * globalDampingForceMult);//.multiply(norm).multiply(relativeVel.clone().dot(norm));
+
+
+                var force = norm.clone().multiply(spring.dist - distC).multiply(spring.force * globalSpringForceMultiplier);
+
+                force.sub(relativeVel);
+                spring.s1.vel.addSelf(force.clone().multiply(1 / spring.s1.mass));
+                spring.s2.vel.subSelf(force.clone().multiply(1 / spring.s2.mass));
+
+
+                spring.line.remove();
+                spring.line = two.makeLine(spring.s1.pos.x, spring.s1.pos.y, spring.s2.pos.x, spring.s2.pos.y);
+            }
+
+            for (var i = 0; i < ls.length; i++) {
+                var obj = ls[i];
+                obj.vel.addSelf(gravity);
+
+                obj.vel.x *= .9999;
+                obj.vel.y *= .9999;
+
+                if (obj.pos.y - obj.radius < 0) {
+                    obj.pos.y = obj.radius;
+                    obj.pos.y += 0.1;
+                    obj.vel.y *= -.2;
+                }
+                if (obj.pos.y + obj.radius > two.height) {
+                    obj.pos.y = two.height - obj.radius;
+                    obj.pos.y -= 0.1;
+                    obj.vel.y *= -.2;
+                }
+                if (obj.pos.x + obj.radius > two.width) {
+                    obj.pos.x = two.width - obj.radius;
+                    obj.pos.x -= 0.1;
+                    obj.vel.x *= -.2;
+                }
+                if (obj.pos.x - obj.radius < 0) {
+                    obj.pos.x = obj.radius;
+                    obj.pos.x += 0.1;
+                    obj.vel.x *= -.2;
+                }
+                for (var j = 0; j < ls.length; j++) {
+                    if (i != j) {
+                        var obj2 = ls[j];
+                        var delta = obj.pos.clone().distanceTo(obj2.pos);
+                        var normal = obj.pos.clone().sub(obj2.pos).normalize();
+                        if (delta < obj.radius + obj2.radius) {
+                            var overlap = (obj.radius + obj2.radius) - delta;
+                            obj.pos.addSelf(normal.clone().multiply(overlap * .51));
+                            obj2.pos.addSelf(normal.clone().negate().multiply(overlap * .51));
+                            var tangentVector = new Two.Vector(0, 0);
+                            tangentVector.y = -(obj2.pos.x - obj.pos.x);
+                            tangentVector.x = obj2.pos.y - obj.pos.y;
+                            tangentVector.normalize();
+                            var relVel = obj2.vel.clone().sub(obj.vel);
+                            var length = relVel.clone().dot(tangentVector);
+                            var velocityComponentOnTangent = tangentVector.clone().multiply(length);
+                            var velocityComponentPerpendicularToTangent = relVel.clone().sub(velocityComponentOnTangent);
+                            obj.vel.add(velocityComponentPerpendicularToTangent);
+                            obj2.vel.sub(velocityComponentPerpendicularToTangent);
+                        }
+                    }
+                }
+            }
+
+            for (var i = 0; i < ls.length; i++) {
+                ls[i].pos.x += ls[i].vel.x;
+                ls[i].pos.y += ls[i].vel.y;
+                ls[i].shape.translation.x = ls[i].pos.x;
+                ls[i].shape.translation.y = ls[i].pos.y;
+            }
+
+            if (mouseState) {
+                for (var i = 0; i < ls.length; i++) {
+                    var delta = ls[i].pos.clone().sub(mousePos);
+                    var distS = mousePos.clone().distanceTo(ls[i].pos);
+                    if(distS > ls[i].radius) {
+                        if(!dragging) {
+                            var norm = delta.clone().normalize().negate();
+                            ls[i].vel.addSelf(
+                                norm.clone().multiply(1 / distS)
+                                    .multiply(1 / ls[i].mass)
+                                    .multiply(8)
+                            );
+                        }
+                    } else {
+                        draggingIdx = i;
+                        dragging = true;
+                    }
+                }
+                if(dragging) {
+                    ls[draggingIdx].pos = mousePos.clone();
+                    ls[draggingIdx].vel.clear();
+                }
+            }
+
+        });
+
+        document.addEventListener("mousemove", () => {
+            let mousex = event.clientX; // Gets Mouse X
+            let mousey = event.clientY; // Gets Mouse Y
+            mousePos = new Two.Vector(mousex, mousey);
+        });
+
+        document.addEventListener("mousedown", () => {
+            mouseState = 1;
+        });
+
+        document.addEventListener("mouseup", () => {
+            mouseState = 0;
+            dragging = 0;
+            draggingIdx = -1;
+        });
+
+        function motion(event) {
+            //console.log("Accelerometer: "
+            // + event.accelerationIncludingGravity.x + ", "
+            //  + event.accelerationIncludingGravity.y + ", "
+            //  + event.accelerationIncludingGravity.z
+            //);
+
+            gravity.x = -event.accelerationIncludingGravity.x * 0.01;
+            gravity.y = event.accelerationIncludingGravity.y * 0.01;
+        }
+        if (window.DeviceMotionEvent) {
+            window.addEventListener("devicemotion", motion, false);
+        } else {
+            console.log("DeviceMotionEvent is not supported");
+        }
+
+    </script>
+</body>
+</html>
