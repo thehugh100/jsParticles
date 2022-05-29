@@ -162,8 +162,8 @@
                         var normal = obj.pos.clone().sub(obj2.pos).normalize();
                         if (delta < obj.radius + obj2.radius) {
                             var overlap = (obj.radius + obj2.radius) - delta;
-                            obj.pos.addSelf(normal.clone().multiply(overlap * .51));
-                            obj2.pos.addSelf(normal.clone().negate().multiply(overlap * .51));
+                            obj.pos.addSelf(normal.clone().multiply(overlap * .5));
+                            obj2.pos.addSelf(normal.clone().negate().multiply(overlap * .5));
                             var tangentVector = new Two.Vector(0, 0);
                             tangentVector.y = -(obj2.pos.x - obj.pos.x);
                             tangentVector.x = obj2.pos.y - obj.pos.y;
@@ -171,7 +171,7 @@
                             var relVel = obj2.vel.clone().sub(obj.vel);
                             var length = relVel.clone().dot(tangentVector);
                             var velocityComponentOnTangent = tangentVector.clone().multiply(length);
-                            var velocityComponentPerpendicularToTangent = relVel.clone().sub(velocityComponentOnTangent);
+                            var velocityComponentPerpendicularToTangent = relVel.clone().sub(velocityComponentOnTangent).multiply(0.8);
                             obj.vel.add(velocityComponentPerpendicularToTangent);
                             obj2.vel.sub(velocityComponentPerpendicularToTangent);
                         }
