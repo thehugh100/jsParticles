@@ -180,6 +180,32 @@
             }
         }
 
+        function linkSelectedCircles() {
+            for(var i = 0; i < ls.length; i++) {
+                for(var j = 0; j < ls.length; j++) {
+                    if(i != j && ls[i].selected && ls[j].selected) {
+                        var exists = 0;
+                        for(var k = 0; k < springs.length; k++) {
+                            var spring = springs[k];
+                            if(
+                                (spring.s1 == ls[i] && spring.s2 == ls[j]) ||
+                                (spring.s2 == ls[i] && spring.s1 == ls[j])
+                            ) {
+                                exists = 1;
+                                break;
+                            }
+                        }
+                        if(!exists) {
+                            createSpring(ls[i], ls[j]);
+                        }
+                    }
+                }
+            }
+            for(var i = 0; i < ls.length; i++) {
+                ls[i].selected = 0;
+            }
+        }
+
         two.bind('update', function () {
 
             if(!pause) {
@@ -194,22 +220,22 @@
                     ls[i].pos.y += ls[i].vel.y;
                     if (obj.pos.y - obj.radius < 0) {
                         obj.pos.y = obj.radius;
-                        obj.pos.y += 0.1;
+                        //obj.pos.y += 0.1;
                         obj.vel.y *= -.2;
                     }
                     if (obj.pos.y + obj.radius > two.height) {
                         obj.pos.y = two.height - obj.radius;
-                        obj.pos.y -= 0.1;
+                        //obj.pos.y -= 0.1;
                         obj.vel.y *= -.2;
                     }
                     if (obj.pos.x + obj.radius > two.width) {
                         obj.pos.x = two.width - obj.radius;
-                        obj.pos.x -= 0.1;
+                        //obj.pos.x -= 0.1;
                         obj.vel.x *= -.2;
                     }
                     if (obj.pos.x - obj.radius < 0) {
                         obj.pos.x = obj.radius;
-                        obj.pos.x += 0.1;
+                        //obj.pos.x += 0.1;
                         obj.vel.x *= -.2;
                     }
                 }
@@ -298,16 +324,19 @@
             if(e.key == " ") {
                 pause = !pause;
             } else if(e.key == "s") {
+                linkSelectedCircles();
+            } else if(e.key == "c") {
                 for(var i = 0; i < ls.length; i++) {
-                    for(var j = 0; j < ls.length; j++) {
-                        if(i != j && ls[i].selected && ls[j].selected) {
-                            createSpring(ls[i], ls[j]);
-                        }
-                    }
+                    two.remove(ls[i].shape);
+                    two.remove(ls[i].line);
                 }
-                for(var i = 0; i < ls.length; i++) {
-                    ls[i].selected = 0;
+                for(var i = 0; i < springs.length; i++) {
+                    springs[i].line.remove();
                 }
+                springs.length = 0;
+                ls.length = 0;
+                springs = [];
+                ls = [];
             }
         });
 
