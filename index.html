@@ -29,12 +29,13 @@
         var ls = [];
         var springs = [];
         var amt = 40;
-        var gravity = new Two.Vector(0, 0.02);
+        var gravity = new Two.Vector(0, 0.08);
         var mousePos = new Two.Vector(0, 0);
         var mouseState = 0;
+        var shiftClick = 0;
         var dragging = 0;
         var draggingIdx = 0;
-        
+        var pause = 0;
         var globalSpringForceMultiplier = 1.;
         var globalDampingForceMult = 1.;
 
@@ -56,14 +57,15 @@
                 vel: vel,
                 mass: 1,
                 radius: 10,
-                id: ls.length
+                id: ls.length,
+                selected: 0
             });
             two.add(circ);
             two.add(line);
             return ls[ls.length - 1];
         }
 
-        function createSpring(s1, s2, force = 0.4024, damping = 0.06) {
+        function createSpring(s1, s2, force = 0.2048, damping = 0.1) {
             var line = new Two.Line(s1.pos.x, s1.pos.y, s2.pos.x, s2.pos.y);
             springs.push({
                 line: line,
@@ -77,6 +79,36 @@
             return springs[springs.length - 1];
         }
 
+        function createBall() {
+            for(var i = 0; i < 16; i++) {
+                var d = 360/16;
+                var x = Math.cos(i * d * 3.14 / 180) * 92;
+                var y = Math.sin(i * d * 3.14 / 180) * 92;
+
+                var p = createCircle(
+                    new Two.Vector(two.width * .5 + x, two.height * .5 + y),
+                    zv()
+                );
+
+                if(i>=1) {
+                    //createSpring(p, ls[p.id-1]);
+                }
+            }
+            //createSpring(ls[ls.length-1], ls[ls.length-16]);
+
+            // for(var i = 0; i < 8; i++) {
+            //     createSpring(ls[ls.length-16 + i], ls[ls.length-16 + i + 8]);
+            // }
+
+            for(var i = 0; i < 16; i++) {
+                for(var j = 0; j < 16; j++) {
+                    if(i!=j) {
+                        createSpring(ls[ls.length-16 + i], ls[ls.length-16 + j]);
+                    }
+                }
+            }
+        }
+    
         for(var i = 0; i < 8; i++) {
             var p1 = createCircle(new Two.Vector(two.width * .5 - 32, 100 + i * 64), zv());
             var p2 = createCircle(new Two.Vector(two.width * .5 + 32, 100 + i * 64), zv());
@@ -90,36 +122,32 @@
             }
         }
 
-
-        two.bind('update', function () {
-
+        function processSprings() {
             for (var i = 0; i < springs.length; i++) {
-                var spring = springs[i];
-                var normS1 = spring.s1.pos.clone().subtract(spring.s2.pos).normalize();
-                var normS2 = spring.s2.pos.clone().subtract(spring.s1.pos).normalize();
+                    var spring = springs[i];
+                    var normS1 = spring.s1.pos.clone().subtract(spring.s2.pos).normalize();
+                    var normS2 = spring.s2.pos.clone().subtract(spring.s1.pos).normalize();
 
-                var distC = spring.s1.pos.clone().distanceTo(spring.s2.pos);
+                    var distC = spring.s1.pos.clone().distanceTo(spring.s2.pos);
 
-                var relativeVelS1 = spring.s1.vel.clone().sub(spring.s2.vel);
-                var relativeVelS2 = spring.s2.vel.clone().sub(spring.s1.vel);
+                    var relativeVelS1 = spring.s1.vel.clone().sub(spring.s2.vel);
+                    var relativeVelS2 = spring.s2.vel.clone().sub(spring.s1.vel);
 
-                var dampingS1 = normS1.clone().multiply(spring.damping * globalDampingForceMult * relativeVelS1.clone().dot(normS1));
-                var dampingS2 = normS2.clone().multiply(spring.damping * globalDampingForceMult * relativeVelS2.clone().dot(normS2));
+                    var dampingS1 = normS1.clone().multiply(spring.damping * globalDampingForceMult * relativeVelS1.clone().dot(normS1));
+                    var dampingS2 = normS2.clone().multiply(spring.damping * globalDampingForceMult * relativeVelS2.clone().dot(normS2));
 
-                var forceS1 = normS1.clone().multiply(spring.dist - distC).multiply(spring.force * globalSpringForceMultiplier);
-                var forceS2 = normS2.clone().multiply(spring.dist - distC).multiply(spring.force * globalSpringForceMultiplier);
+                    var forceS1 = normS1.clone().multiply(spring.dist - distC).multiply(spring.force * globalSpringForceMultiplier);
+                    var forceS2 = normS2.clone().multiply(spring.dist - distC).multiply(spring.force * globalSpringForceMultiplier);
 
-                forceS1.sub(dampingS1);
-                forceS2.sub(dampingS2);
+                    forceS1.sub(dampingS1);
+                    forceS2.sub(dampingS2);
 
-                spring.s1.vel.addSelf(forceS1.clone().multiply(1 / spring.s1.mass));
-                spring.s2.vel.addSelf(forceS2.clone().multiply(1 / spring.s2.mass));
+                    spring.s1.vel.addSelf(forceS1.clone().multiply(1 / spring.s1.mass));
+                    spring.s2.vel.addSelf(forceS2.clone().multiply(1 / spring.s2.mass));
+                }
+        }
 
-
-                spring.line.remove();
-                spring.line = two.makeLine(spring.s1.pos.x, spring.s1.pos.y, spring.s2.pos.x, spring.s2.pos.y);
-            }
-
+        function processCircles() {
             for (var i = 0; i < ls.length; i++) {
                 var obj = ls[i];
                 obj.vel.addSelf(gravity);
@@ -170,32 +198,52 @@
                     }
                 }
             }
+        }
+
+        two.bind('update', function () {
+
+            if(!pause) {
+                processSprings();
+                processCircles();
+            }
 
             for (var i = 0; i < ls.length; i++) {
-                ls[i].pos.x += ls[i].vel.x;
-                ls[i].pos.y += ls[i].vel.y;
+                if(!pause) {
+                    ls[i].pos.x += ls[i].vel.x;
+                    ls[i].pos.y += ls[i].vel.y;
+                }
                 ls[i].shape.translation.x = ls[i].pos.x;
                 ls[i].shape.translation.y = ls[i].pos.y;
                 ls[i].line.translation.x = ls[i].pos.x;
                 ls[i].line.translation.y = ls[i].pos.y;
             }
+            for(var i = 0; i < springs.length; i++) {
+                spring = springs[i];
+                spring.line.remove();
+                spring.line = two.makeLine(spring.s1.pos.x, spring.s1.pos.y, spring.s2.pos.x, spring.s2.pos.y);
+            }
 
-            if (mouseState) {
+            if (mouseState || shiftClick) {
                 for (var i = 0; i < ls.length; i++) {
                     var delta = ls[i].pos.clone().sub(mousePos);
                     var distS = mousePos.clone().distanceTo(ls[i].pos);
                     if(distS > ls[i].radius) {
-                        if(!dragging) {
+                        if(!dragging && !pause && mouseState) {
                             var norm = delta.clone().normalize().negate();
                             ls[i].vel.addSelf(
                                 norm.clone().multiply(1 / distS)
                                     .multiply(1 / ls[i].mass)
-                                    .multiply(8)
+                                    .multiply(16)
                             );
                         }
                     } else {
-                        draggingIdx = i;
-                        dragging = true;
+                        if(mouseState) {
+                            draggingIdx = i;
+                            dragging = true;
+                        }
+                        if(shiftClick) {
+                            ls[i].selected = 1;
+                        }
                     }
                 }
                 if(dragging) {
@@ -206,20 +254,41 @@
 
         });
 
+        document.body.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            return false;
+        }); 
+        
         document.addEventListener("mousemove", () => {
             let mousex = event.clientX; // Gets Mouse X
             let mousey = event.clientY; // Gets Mouse Y
             mousePos = new Two.Vector(mousex, mousey);
         });
 
-        document.addEventListener("mousedown", () => {
-            mouseState = 1;
+        document.addEventListener("mousedown", (e) => {
+            //console.log(e);
+            if(e.button == 0) {
+                if(e.shiftKey) {
+                    shiftClick = 1;
+                } else {
+                    mouseState = 1;
+                }
+            } else if(e.button == 2) {
+                createCircle(mousePos.clone(), zv());
+            }
         });
 
         document.addEventListener("mouseup", () => {
             mouseState = 0;
             dragging = 0;
             draggingIdx = -1;
+            shiftClick = 0;
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if(e.key == " ") {
+                pause = !pause;
+            }
         });
 
         function motion(event) {
