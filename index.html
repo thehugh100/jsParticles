@@ -58,7 +58,8 @@
                 mass: 1,
                 radius: 10,
                 id: ls.length,
-                selected: 0
+                selected: 0,
+                static: 0,
             });
             two.add(circ);
             two.add(line);
@@ -150,10 +151,11 @@
         function processCircles() {
             for (var i = 0; i < ls.length; i++) {
                 var obj = ls[i];
-                obj.vel.addSelf(gravity);
-
-                obj.vel.x *= .9999;
-                obj.vel.y *= .9999;
+                if(!obj.static) {
+                    obj.vel.addSelf(gravity);
+                    obj.vel.x *= .9999;
+                    obj.vel.y *= .9999;
+                }
 
                 for (var j = 0; j < ls.length; j++) {
                     if (i != j) {
@@ -162,8 +164,13 @@
                         var normal = obj.pos.clone().sub(obj2.pos).normalize();
                         if (delta < obj.radius + obj2.radius) {
                             var overlap = (obj.radius + obj2.radius) - delta;
-                            obj.pos.addSelf(normal.clone().multiply(overlap * .5));
-                            obj2.pos.addSelf(normal.clone().negate().multiply(overlap * .5));
+                            if(!obj.static) {
+                                obj.pos.addSelf(normal.clone().multiply(overlap * .5));
+                            }
+                            if(!obj2.static) {
+                                obj2.pos.addSelf(normal.clone().negate().multiply(overlap * .5));
+                            }
+                            
                             var tangentVector = new Two.Vector(0, 0);
                             tangentVector.y = -(obj2.pos.x - obj.pos.x);
                             tangentVector.x = obj2.pos.y - obj.pos.y;
@@ -176,6 +183,9 @@
                             obj2.vel.sub(velocityComponentPerpendicularToTangent);
                         }
                     }
+                }
+                if(obj.static) {
+                    obj.vel = zv();
                 }
             }
         }
@@ -216,8 +226,10 @@
             for (var i = 0; i < ls.length; i++) {
                 if(!pause) {
                     var obj = ls[i];
-                    ls[i].pos.x += ls[i].vel.x;
-                    ls[i].pos.y += ls[i].vel.y;
+                    if(!ls[i].static) {
+                        ls[i].pos.x += ls[i].vel.x;
+                        ls[i].pos.y += ls[i].vel.y;
+                    }
                     if (obj.pos.y - obj.radius < 0) {
                         obj.pos.y = obj.radius;
                         //obj.pos.y += 0.1;
@@ -242,7 +254,11 @@
                 if(ls[i].selected) {
                     ls[i].shape.fill="#222222";
                 } else {
-                    ls[i].shape.fill="#ffffff";
+                    if(ls[i].static) {
+                        ls[i].shape.fill="#aaaaaa";
+                    } else {
+                        ls[i].shape.fill="#ffffff";
+                    }
                 }
                 ls[i].shape.translation.x = ls[i].pos.x;
                 ls[i].shape.translation.y = ls[i].pos.y;
@@ -337,6 +353,13 @@
                 ls.length = 0;
                 springs = [];
                 ls = [];
+            } else if(e.key == "h") {
+                for(var i = 0; i < ls.length; i++) {
+                    if(ls[i].selected) {
+                        ls[i].static = !ls[i].static;
+                        ls[i].selected = 0;
+                    }
+                }
             }
         });
 
