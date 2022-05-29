@@ -212,6 +212,11 @@
                     ls[i].pos.x += ls[i].vel.x;
                     ls[i].pos.y += ls[i].vel.y;
                 }
+                if(ls[i].selected) {
+                    ls[i].shape.fill="#222222";
+                } else {
+                    ls[i].shape.fill="#ffffff";
+                }
                 ls[i].shape.translation.x = ls[i].pos.x;
                 ls[i].shape.translation.y = ls[i].pos.y;
                 ls[i].line.translation.x = ls[i].pos.x;
@@ -225,6 +230,9 @@
 
             if (mouseState || shiftClick) {
                 for (var i = 0; i < ls.length; i++) {
+                    if(mouseState) {
+                        ls[i].selected = 0;
+                    }
                     var delta = ls[i].pos.clone().sub(mousePos);
                     var distS = mousePos.clone().distanceTo(ls[i].pos);
                     if(distS > ls[i].radius) {
@@ -288,6 +296,17 @@
         document.addEventListener("keydown", (e) => {
             if(e.key == " ") {
                 pause = !pause;
+            } else if(e.key == "s") {
+                for(var i = 0; i < ls.length; i++) {
+                    for(var j = 0; j < ls.length; j++) {
+                        if(i != j && ls[i].selected && ls[j].selected) {
+                            createSpring(ls[i], ls[j]);
+                        }
+                    }
+                }
+                for(var i = 0; i < ls.length; i++) {
+                    ls[i].selected = 0;
+                }
             }
         });
 
