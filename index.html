@@ -160,27 +160,30 @@
                 for (var j = 0; j < ls.length; j++) {
                     if (i != j) {
                         var obj2 = ls[j];
-                        var delta = obj.pos.clone().distanceTo(obj2.pos);
-                        var normal = obj.pos.clone().sub(obj2.pos).normalize();
-                        if (delta < obj.radius + obj2.radius) {
-                            var overlap = (obj.radius + obj2.radius) - delta;
-                            if(!obj.static) {
-                                obj.pos.addSelf(normal.clone().multiply(overlap * .5));
+                        var manhattenDist = Math.abs(obj.pos.x - obj2.pos.x) + Math.abs(obj.pos.y - obj2.pos.y);
+                        if(manhattenDist < 30) {
+                            var delta = obj.pos.distanceTo(obj2.pos);
+                            var normal = obj.pos.clone().sub(obj2.pos).normalize();
+                            if (delta < obj.radius + obj2.radius) {
+                                var overlap = (obj.radius + obj2.radius) - delta;
+                                if(!obj.static) {
+                                    obj.pos.addSelf(normal.clone().multiply(overlap * .5001));
+                                }
+                                if(!obj2.static) {
+                                    obj2.pos.addSelf(normal.clone().negate().multiply(overlap * .5001));
+                                }
+                                
+                                var tangentVector = new Two.Vector(0, 0);
+                                tangentVector.y = -(obj2.pos.x - obj.pos.x);
+                                tangentVector.x = obj2.pos.y - obj.pos.y;
+                                tangentVector.normalize();
+                                var relVel = obj2.vel.clone().sub(obj.vel);
+                                var length = relVel.clone().dot(tangentVector);
+                                var velocityComponentOnTangent = tangentVector.clone().multiply(length);
+                                var velocityComponentPerpendicularToTangent = relVel.clone().sub(velocityComponentOnTangent).multiply(0.8);
+                                obj.vel.add(velocityComponentPerpendicularToTangent);
+                                obj2.vel.sub(velocityComponentPerpendicularToTangent);
                             }
-                            if(!obj2.static) {
-                                obj2.pos.addSelf(normal.clone().negate().multiply(overlap * .5));
-                            }
-                            
-                            var tangentVector = new Two.Vector(0, 0);
-                            tangentVector.y = -(obj2.pos.x - obj.pos.x);
-                            tangentVector.x = obj2.pos.y - obj.pos.y;
-                            tangentVector.normalize();
-                            var relVel = obj2.vel.clone().sub(obj.vel);
-                            var length = relVel.clone().dot(tangentVector);
-                            var velocityComponentOnTangent = tangentVector.clone().multiply(length);
-                            var velocityComponentPerpendicularToTangent = relVel.clone().sub(velocityComponentOnTangent).multiply(0.8);
-                            obj.vel.add(velocityComponentPerpendicularToTangent);
-                            obj2.vel.sub(velocityComponentPerpendicularToTangent);
                         }
                     }
                 }
@@ -267,8 +270,13 @@
             }
             for(var i = 0; i < springs.length; i++) {
                 spring = springs[i];
-                spring.line.remove();
-                spring.line = two.makeLine(spring.s1.pos.x, spring.s1.pos.y, spring.s2.pos.x, spring.s2.pos.y);
+                //spring.line.remove();
+                //spring.line = two.makeLine(spring.s1.pos.x, spring.s1.pos.y, spring.s2.pos.x, spring.s2.pos.y);
+                spring.line.vertices[0].x = spring.s1.pos.x;
+                spring.line.vertices[0].y = spring.s1.pos.y;
+
+                spring.line.vertices[1].x = spring.s2.pos.x;
+                spring.line.vertices[1].y = spring.s2.pos.y;
             }
 
             if (mouseState || shiftClick) {
