@@ -60,6 +60,15 @@
                 id: ls.length,
                 selected: 0,
                 static: 0,
+                // Avoiding use of .clone() (and allocating new vectors by statically allocating them here)
+                _tangent: zv(), 
+                _normal: zv(),
+                _invNormal: zv(),
+                _col1: zv(),
+                _col2: zv(),
+                _tmp: zv(),
+                _tmp2: zv(),
+                _tmp3: zv()
             });
             two.add(circ);
             two.add(line);
@@ -163,24 +172,26 @@
                         var manhattenDist = Math.abs(obj.pos.x - obj2.pos.x) + Math.abs(obj.pos.y - obj2.pos.y);
                         if(manhattenDist < 30) {
                             var delta = obj.pos.distanceTo(obj2.pos);
-                            var normal = obj.pos.clone().sub(obj2.pos).normalize();
                             if (delta < obj.radius + obj2.radius) {
+                                
+                                var normal = obj._normal.copy(obj.pos).sub(obj2.pos).normalize();
                                 var overlap = (obj.radius + obj2.radius) - delta;
                                 if(!obj.static) {
-                                    obj.pos.addSelf(normal.clone().multiply(overlap * .5001));
+                                    obj.pos.addSelf(obj._col1.copy(normal).multiply(overlap * .5001));
                                 }
                                 if(!obj2.static) {
-                                    obj2.pos.addSelf(normal.clone().negate().multiply(overlap * .5001));
+                                    obj2.pos.addSelf(obj._col2.copy(normal).negate().multiply(overlap * .5001));
                                 }
                                 
-                                var tangentVector = new Two.Vector(0, 0);
+                                var tangentVector = obj._tangent;
+                                tangentVector.clear();
                                 tangentVector.y = -(obj2.pos.x - obj.pos.x);
                                 tangentVector.x = obj2.pos.y - obj.pos.y;
                                 tangentVector.normalize();
-                                var relVel = obj2.vel.clone().sub(obj.vel);
-                                var length = relVel.clone().dot(tangentVector);
-                                var velocityComponentOnTangent = tangentVector.clone().multiply(length);
-                                var velocityComponentPerpendicularToTangent = relVel.clone().sub(velocityComponentOnTangent).multiply(0.8);
+                                var relVel = obj._tmp.copy(obj2.vel).sub(obj.vel);
+                                var length = obj._tmp2.copy(relVel).dot(tangentVector);
+                                var velocityComponentOnTangent = obj._tmp3.copy(tangentVector).multiply(length);
+                                var velocityComponentPerpendicularToTangent = relVel.sub(velocityComponentOnTangent).multiply(0.8);
                                 obj.vel.add(velocityComponentPerpendicularToTangent);
                                 obj2.vel.sub(velocityComponentPerpendicularToTangent);
                             }
