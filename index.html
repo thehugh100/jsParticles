@@ -26,8 +26,10 @@
             autostart: true
         }).appendTo(document.getElementById("scene"));
         
+        var dbgHelpers = [];
         var ls = [];
         var springs = [];
+        var lines = [];
         var amt = 40;
         var gravity = new Two.Vector(0, 0.08);
         var mousePos = new Two.Vector(0, 0);
@@ -39,6 +41,33 @@
         var globalSpringForceMultiplier = 1.;
         var globalDampingForceMult = 1.;
         var globalWallBounce = 0.4;
+        var centerX = two.width * .5;
+        var centerY = two.height * .5;
+        var theme = "dark";
+        
+        var springGroup = two.makeGroup();
+        var circleGroup = two.makeGroup();
+
+        var colors = {
+            "light": {
+                shapeFill: "#ffffff",
+                shapeFillSelected: "#222222",
+                shapeStroke: "#000000",
+                springStroke: "#222222",
+                shapeStatic: "#aaaaaa",
+                bg: "#ffffff"
+            },
+            "dark": {
+                shapeFill: "#151515",
+                shapeFillSelected: "#888888",
+                shapeStroke: "#e0e0e0",
+                springStroke: "#999999",
+                shapeStatic: "#666666",
+                bg: "#151515"
+            }
+        };
+
+        document.body.bgColor = colors[theme].bg;
 
         function zv() {
             return new Two.Vector(0,0);
@@ -46,6 +75,61 @@
 
         function rand() {
             return Math.random() - .5;
+        }
+
+        function perp(v) {
+            return new Two.Vector(v.y, -v.x);
+        }
+
+        function createLine(pos1, pos2) {
+            var line = new Two.Line(pos1.x,pos1.y,pos2.x,pos2.y);
+            var direction = pos2.clone().sub(pos1).normalize();
+            var normal = zv();
+            normal.x = direction.y;
+            normal.y = -direction.x;
+
+            lines.push({
+                line: line,
+                start: pos1,
+                end: pos2,
+                bb_minx: Math.min(pos1.x, pos2.x),
+                bb_maxx: Math.max(pos1.x, pos2.x),
+                bb_miny: Math.min(pos1.y, pos2.y),
+                bb_maxy: Math.max(pos1.y, pos2.y),
+                length: pos1.distanceTo(pos2),
+                direction: direction,
+                normal: normal,
+                midpoint: pos1.clone().add(pos2).multiply(0.5)
+            });
+            line.stroke = colors[theme].shapeStroke;
+            two.add(line);
+        }
+
+        function createDebugHelper(pos1, pos2, col = "#ff0000") {
+            line = new Two.Line(pos1.x,pos1.y,pos2.x,pos2.y);
+            dbgHelpers.push({
+                line: line,
+                start: pos1,
+                end: pos2,
+                life: 32,
+            });
+            line.stroke = col;
+            two.add(line);
+        }
+
+        function removeDebugHelpers() {
+            var living = 0;
+            for(var i = 0; i < dbgHelpers.length; i++) {
+                dbgHelpers[i].life--;
+                if(dbgHelpers[i].life <= 0) {
+                    dbgHelpers[i].line.remove();
+                } else {
+                    living++;
+                }
+            }
+            if(!living) {
+                dbgHelpers = [];
+            }
         }
 
         function createCircle(pos, vel) {
@@ -71,10 +155,11 @@
                 _col2: zv(),
                 _tmp: zv(),
                 _tmp2: zv(),
-                _tmp3: zv()
+                _tmp3: zv(),
             });
-            two.add(circ);
-            two.add(line);
+            circleGroup.add(circ);
+            line.stroke = colors[theme].shapeStroke;
+            circleGroup.add(line);
             return ls[ls.length - 1];
         }
 
@@ -88,7 +173,8 @@
                 force: force,
                 damping: damping,
             });
-            two.add(line);
+            line.stroke = colors[theme].springStroke;
+            springGroup.add(line);
             return springs[springs.length - 1];
         }
 
@@ -134,6 +220,14 @@
 
             }
         }
+        // createCircle(new Two.Vector(centerX - 75, 200), zv());
+        // createLine(new Two.Vector(centerX - 150, 300), new Two.Vector(centerX - 50, 400));
+        // createLine(new Two.Vector(centerX + 50, 500), new Two.Vector(centerX + 150, 400));
+        // createLine(new Two.Vector(centerX - 100, 700), new Two.Vector(centerX + 100, 700));
+
+        function vectorProject(v1, v2) {
+            return v2.clone().multiply(v2.dot(v1) / v2.lengthSquared());
+        }
 
         function processSprings() {
             for (var i = 0; i < springs.length; i++) {
@@ -163,12 +257,6 @@
         function processCircles() {
             for (var i = 0; i < ls.length; i++) {
                 var obj = ls[i];
-                if(!obj.static) {
-                    obj.vel.addSelf(gravity);
-                    obj.vel.x *= .9999;
-                    obj.vel.y *= .9999;
-                }
-
                 for (var j = 0; j < ls.length; j++) {
                     if (i != j) {
                         var obj2 = ls[j];
@@ -201,8 +289,74 @@
                         }
                     }
                 }
+                for(var l = 0; l < lines.length; l++) {
+                    var line = lines[l];
+                    if(
+                        (obj.pos.x + obj.radius >= line.bb_minx) && 
+                        (obj.pos.x - obj.radius <= line.bb_maxx) && 
+                        (obj.pos.y + obj.radius >= line.bb_miny) && 
+                        (obj.pos.y - obj.radius <= line.bb_maxy)
+                    ) {
+                        //inside BBox
+                        var tPos = line.start.clone();
+                        var step = line.direction.clone().multiply(obj.radius * .1);
+                        var intersections = [];
+                        for(var r = 0; r <= line.length + obj.radius; r+= obj.radius * .1) {
+                            tPos.add(step);
+                            if(tPos.distanceTo(obj.pos) <= obj.radius) {
+                                intersections.push(tPos.clone());
+                            }
+                        }
+                        if(intersections.length) {
+                            //collided
+                            var collisionMidpoint = intersections[0].clone()
+                                .add(intersections[intersections.length-1])
+                                .multiply(.5);
+
+                            if(intersections.length == 1) {
+                                collisionMidpoint = intersections[0].clone();
+                            }
+
+                            var normal = obj.pos.clone().sub(collisionMidpoint).normalize();
+                            var overlap = collisionMidpoint.distanceTo(obj.pos);
+                            obj.pos.add(normal.clone().multiply((obj.radius-overlap) * 1.0));
+                            var origVel = obj.vel.clone();
+                            var vDotN = origVel.clone().dot(normal) * -2;
+                            obj.vel = normal.clone().multiply(vDotN).add(origVel).multiply(.5);
+
+                            createDebugHelper(
+                                collisionMidpoint.clone(), 
+                                collisionMidpoint.clone().add(normal.clone().multiply(16))
+                            );
+
+                            var velAlongAxis = vectorProject(obj.vel.clone(), line.direction.clone());
+
+                            createDebugHelper(
+                                collisionMidpoint.clone(), 
+                                collisionMidpoint.clone().add(velAlongAxis.clone().multiply(16))
+                            );
+                            
+                            var targetAngVel = velAlongAxis.x * (1. / (2 * 3.1415));
+                            var dif = targetAngVel - obj.angVel;
+                            obj.angVel += dif * 0.6;
+                            velAlongAxis.x -= dif * 0.4 * 2 * 3.1415;
+                            obj.vel.add(velAlongAxis);
+
+                            // var targetAngVel = velAlongAxis.x * (1. / (2 * 3.1415));
+                            // var dif = targetAngVel - obj.angVel;
+                            // obj.angVel += dif * 0.6;
+                            // velAlongAxis.x -= dif * 0.4 * 2 * 3.1415;
+                            // obj.vel.add(velAlongAxis);
+                        }
+                    }
+                }
                 if(obj.static) {
                     obj.vel = zv();
+                } else {
+                    obj.vel.addSelf(gravity);
+                    obj.vel.x *= .9999;
+                    obj.vel.y *= .9999;
+                    ls[i].angVel *= 0.99;
                 }
             }
         }
@@ -234,10 +388,19 @@
         }
 
         two.bind('update', function () {
+            removeDebugHelpers();
+            var centerX = two.width * .5;
+            var centerY = two.height * .5;
 
             if(!pause) {
                 processSprings();
                 processCircles();
+                for(var i = 0; i < lines.length; i++) {
+                    createDebugHelper(
+                        lines[i].midpoint, 
+                        lines[i].midpoint.clone().add(lines[i].normal.clone().multiply(32))
+                    );
+                }
             }
 
             for (var i = 0; i < ls.length; i++) {
@@ -246,6 +409,7 @@
                     if(!ls[i].static) {
                         ls[i].pos.x += ls[i].vel.x;
                         ls[i].pos.y += ls[i].vel.y;
+                        ls[i].rotation += ls[i].angVel;
                     }
 
                     if (obj.pos.y - obj.radius < 0) {
@@ -277,16 +441,16 @@
                     }
                 }
                 if(ls[i].selected) {
-                    ls[i].shape.fill="#222222";
+                    ls[i].shape.fill= colors[theme].shapeFillSelected;
                 } else {
                     if(ls[i].static) {
-                        ls[i].shape.fill="#aaaaaa";
+                        ls[i].shape.fill=colors[theme].shapeStatic;
                     } else {
-                        ls[i].shape.fill="#ffffff";
+                        ls[i].shape.fill=colors[theme].shapeFill;
+                        ls[i].shape.stroke=colors[theme].shapeStroke;
                     }
                 }
-                ls[i].rotation += ls[i].angVel;
-                ls[i].angVel *= 0.99;
+                
                 ls[i].shape.translation.x = ls[i].pos.x;
                 ls[i].shape.translation.y = ls[i].pos.y;
                 ls[i].line.translation.x = ls[i].pos.x;
